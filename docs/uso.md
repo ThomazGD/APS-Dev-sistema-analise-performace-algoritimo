@@ -1,6 +1,6 @@
 # Como usar o programa
 
-Execute o programa a partir da raiz do repositório. As instruções de compilação estão no [README](../README.md). A interface é textual e reúne entrada, processamento e saída no mesmo menu.
+No Windows x64, execute `aps.exe` na raiz da pasta extraída do ZIP do repositório; não é necessário instalar um compilador. Para compilar a partir do código, siga o [README](../README.md) e execute `build/aps.exe` também a partir da raiz. A interface é textual e reúne entrada, processamento e saída no mesmo menu.
 
 | Opção | Função |
 | --- | --- |

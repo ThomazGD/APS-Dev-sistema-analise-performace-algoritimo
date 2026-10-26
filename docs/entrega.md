@@ -1,6 +1,6 @@
 # Preparação da entrega e do repositório
 
-O repositório deve permitir que outra pessoa compile e execute o projeto sem o executável produzido no computador do grupo. Inclua `src/`, `include/`, `tests/`, `dados/exemplo.csv`, `CMakeLists.txt`, `README.md`, a pasta `docs/` e, se forem usados na monografia, os CSVs e gráficos de `resultados/`. Não é necessário subir `build/` nem arquivos `.exe`; eles estão no `.gitignore`.
+O repositório inclui o código-fonte (`src/`, `include/`, `tests/`), o CSV de exemplo, CMake, documentação e resultados. Inclui também **`aps.exe` na raiz**, compilado para Windows x64, para demonstrar o programa sem instalar um compilador. A pasta `build/` e outros `.exe` continuam excluídos pelo `.gitignore`. Após alterar o código, recompile e atualize o `aps.exe` publicado; ele não muda automaticamente quando os arquivos `.c` são enviados ao GitHub.
 
 ## Execução de referência para a monografia
 

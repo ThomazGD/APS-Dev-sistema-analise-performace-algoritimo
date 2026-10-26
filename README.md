@@ -2,7 +2,9 @@
 
 Projeto em **C11** com menu no terminal para comparar o desempenho de Insertion Sort, Merge Sort e Quick Sort. Os registros **simulam** metadados de imagens de satélite: ID, data (AAAAMMDD) e cobertura de nuvens (0 a 100). A chave de ordenação é o percentual de nuvens, em ordem crescente. Nenhuma imagem real ou dado do INPE/TerraBrasilis é utilizado.
 
-Para uma demonstração rápida: compile o programa, execute `build/aps.exe`, use `1` para gerar dados, `4` para comparar os métodos, `9` para gerar tabelas e gráficos e `13` para registrar uma falha de alocação em processo isolado. As opções completas estão em [uso do programa](docs/uso.md).
+Para uma demonstração rápida: execute `aps.exe`, use `1` para gerar dados, `4` para comparar os métodos, `9` para gerar tabelas e gráficos e `13` para registrar uma falha de alocação em processo isolado. As opções completas estão em [uso do programa](docs/uso.md).
+
+**Windows sem compilador:** baixe o ZIP do repositório, extraia **todos** os arquivos e execute `aps.exe` na raiz da pasta extraída. Esse executável já foi compilado para Windows x64; não é preciso instalar MSYS2, GCC, VS Code ou Windsurf para rodá-lo. Mantenha a pasta `dados/` ao lado do executável para importar `dados/exemplo.csv`. O programa cria a pasta `resultados/` quando necessário. Para modificar o código ou executar em outro sistema, compile a partir dos fontes.
 
 ## Estrutura
 
