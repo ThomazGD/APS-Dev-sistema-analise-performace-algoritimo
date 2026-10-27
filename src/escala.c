@@ -1,4 +1,5 @@
 #include "aps.h"
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,9 +23,14 @@ static int testar_vetores(size_t orcamento, int ate_falha, const char *caminho) 
     fprintf(saida, "registros,bytes_tres_vetores,limite_bytes,resultado\n");
     size_t ultimo = 0;
     int falhou = 0;
-    for (size_t n = 1000; n <= SIZE_MAX / (3 * sizeof(Imagem)); ) {
+    for (size_t n = 1000; n <= SIZE_MAX / (3 * sizeof(Imagem)) && n <= INT_MAX; ) {
         size_t bytes = n * 3 * sizeof(Imagem);
         if (!ate_falha && bytes > orcamento) break;
+        if (ate_falha) {
+            printf("Tentando %zu registros (3 vetores, %.2f MiB)...\n",
+                   n, (double)bytes / (1024.0 * 1024.0));
+            fflush(stdout);
+        }
         Imagem *a = malloc(n * sizeof *a);
         Imagem *b = malloc(n * sizeof *b);
         Imagem *c = malloc(n * sizeof *c);
@@ -46,20 +52,27 @@ static int testar_vetores(size_t orcamento, int ate_falha, const char *caminho) 
             vc[i].nuvens = a[i].nuvens;
         }
         fprintf(saida, "%zu,%zu,%zu,sucesso\n", n, bytes, orcamento);
+        fflush(saida);
+        if (ate_falha) {
+            puts("Alocacao e preenchimento concluidos.");
+            fflush(stdout);
+        }
         ultimo = n;
         free(a); free(b); free(c);
-        if (n > SIZE_MAX / 2) break;
+        if (n > SIZE_MAX / 2 || n > INT_MAX / 2) break;
         n *= 2;
     }
-    if (!falhou) fprintf(saida, "%zu,%zu,%zu,limite_seguranca\n",
-                         ultimo, ultimo * 3 * sizeof(Imagem), orcamento);
+    if (!falhou) fprintf(saida, "%zu,%zu,%zu,%s\n",
+                         ultimo, ultimo * 3 * sizeof(Imagem), orcamento,
+                         ate_falha ? "limite_representacao" : "limite_seguranca");
     int gravado = !ferror(saida);
     if (fclose(saida) != 0) gravado = 0;
     if (!gravado) { fprintf(stderr, "Falha ao gravar CSV de memoria.\n"); return 0; }
     printf("Maior tamanho concluido: %zu registros (3 vetores, %.2f MiB).\n",
            ultimo, (double)(ultimo * 3 * sizeof(Imagem)) / (1024.0 * 1024.0));
     puts(falhou ? "Parada: falha de alocacao." :
-                  "Parada: limite de seguranca; nao houve falha de memoria.");
+                  ate_falha ? "Parada: limite do campo ID (int); nao houve falha de memoria." :
+                              "Parada: limite de seguranca; nao houve falha de memoria.");
     printf("Detalhes em %s.\n", caminho);
     return ate_falha ? falhou : 1;
 }
@@ -78,18 +91,7 @@ int executar_teste_memoria(size_t limite_mb) {
 
 int executar_teste_memoria_filho(void) {
 #ifdef _WIN32
-    BOOL associado = FALSE;
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limites = {0};
-    if (!IsProcessInJob(GetCurrentProcess(), NULL, &associado) || !associado ||
-        !QueryInformationJobObject(NULL, JobObjectExtendedLimitInformation,
-                                   &limites, sizeof limites, NULL) ||
-        !(limites.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_PROCESS_MEMORY) ||
-        limites.ProcessMemoryLimit < 64u * 1024u * 1024u ||
-        limites.ProcessMemoryLimit > 1024u * 1024u * 1024u) {
-        fprintf(stderr, "Teste cancelado: limite de memoria isolado nao confirmado.\n");
-        return 0;
-    }
-    return testar_vetores((size_t)limites.ProcessMemoryLimit, 1,
+    return testar_vetores(0, 1,
                           "resultados/escala_falha.csv");
 #else
     fprintf(stderr, "Teste ate falha requer Windows.\n");
@@ -97,9 +99,8 @@ int executar_teste_memoria_filho(void) {
 #endif
 }
 
-int executar_teste_memoria_ate_falha(size_t limite_mb) {
+int executar_teste_memoria_ate_falha(void) {
 #ifdef _WIN32
-    if (limite_mb < 64 || limite_mb > 1024) return 0;
     char programa[MAX_PATH], comando[MAX_PATH + 32];
     DWORD tamanho = GetModuleFileNameA(NULL, programa, sizeof programa);
     if (tamanho == 0 || tamanho >= sizeof programa ||
@@ -107,45 +108,21 @@ int executar_teste_memoria_ate_falha(size_t limite_mb) {
         fprintf(stderr, "Nao foi possivel localizar o executavel.\n");
         return 0;
     }
-    HANDLE job = CreateJobObjectA(NULL, NULL);
-    if (!job) { fprintf(stderr, "Nao foi possivel criar processo isolado.\n"); return 0; }
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limites = {0};
-    limites.BasicLimitInformation.LimitFlags =
-        JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    limites.ProcessMemoryLimit = limite_mb * (SIZE_T)1024 * 1024;
-    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation,
-                                 &limites, sizeof limites)) {
-        fprintf(stderr, "Nao foi possivel limitar a memoria do processo isolado.\n");
-        CloseHandle(job);
-        return 0;
-    }
     STARTUPINFOA inicio = {0};
     PROCESS_INFORMATION processo = {0};
     inicio.cb = sizeof inicio;
-    if (!CreateProcessA(programa, comando, NULL, NULL, TRUE, CREATE_SUSPENDED,
+    if (!CreateProcessA(programa, comando, NULL, NULL, TRUE, 0,
                         NULL, NULL, &inicio, &processo)) {
         fprintf(stderr, "Nao foi possivel iniciar o processo isolado.\n");
-        CloseHandle(job);
         return 0;
     }
-    if (!AssignProcessToJobObject(job, processo.hProcess)) {
-        fprintf(stderr, "Nao foi possivel aplicar o limite ao processo; teste cancelado.\n");
-        TerminateProcess(processo.hProcess, 1);
-        WaitForSingleObject(processo.hProcess, INFINITE);
-        CloseHandle(processo.hThread);
-        CloseHandle(processo.hProcess);
-        CloseHandle(job);
-        return 0;
-    }
-    printf("Processo isolado com limite de %zu MiB; tentando ate falhar.\n", limite_mb);
+    puts("Processo separado, sem teto artificial de memoria; tentando ate falhar.");
     fflush(stdout);
-    ResumeThread(processo.hThread);
     WaitForSingleObject(processo.hProcess, INFINITE);
     DWORD codigo = 1;
     GetExitCodeProcess(processo.hProcess, &codigo);
     CloseHandle(processo.hThread);
     CloseHandle(processo.hProcess);
-    CloseHandle(job);
     if (codigo != 0) {
         fprintf(stderr, "O teste isolado terminou com erro (codigo %lu).\n",
                 (unsigned long)codigo);
@@ -153,7 +130,6 @@ int executar_teste_memoria_ate_falha(size_t limite_mb) {
     }
     return 1;
 #else
-    (void)limite_mb;
     fprintf(stderr, "O teste ate falha requer Windows.\n");
     return 0;
 #endif

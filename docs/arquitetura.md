@@ -14,9 +14,9 @@ CSV ou gerador -> vetor atual de Imagem
 
 `src/experimentos.c` executa a bateria: três cenários, com tamanhos e repetições padrão ou escolhidos pelo usuário. Cada repetição gera uma entrada; os três métodos recebem cópias dessa mesma entrada. Os tempos individuais vão para CSV, e um segundo CSV contém média, mediana, mínimo e máximo. O módulo também gera três gráficos SVG de medianas em escala logarítmica. A geração, a cópia, a validação e a gravação ficam fora do intervalo cronometrado.
 
-`src/escala.c` testa a capacidade de três vetores dinâmicos em tamanhos crescentes. A opção controlada pode parar pelo orçamento de segurança; a opção isolada inicia outro processo com limite próprio de memória e continua até uma falha de alocação. O código força o uso das páginas alocadas antes de considerar uma etapa concluída. Esse módulo mede capacidade de memória, não tempo de ordenação; tamanhos extremos não entram automaticamente na bateria dos três algoritmos.
+`src/escala.c` testa a capacidade de três vetores dinâmicos em tamanhos crescentes. A opção controlada pode parar pelo orçamento de segurança; a opção isolada inicia outro processo sem teto artificial e continua até uma falha de alocação ou o limite de representação do ID. O código preenche os vetores antes de considerar uma etapa concluída. Esse módulo mede capacidade de memória, não tempo de ordenação; tamanhos extremos não entram automaticamente na bateria dos três algoritmos.
 
-O vetor atual usa armazenamento estático para até 1000 registros e armazenamento dinâmico acima disso. Os vetores de trabalho e o auxiliar do Merge Sort são dinâmicos. A fila faz cópias dinâmicas dos dados enfileirados. A interface atual limita cada entrada a 100000 registros, verifica falhas de alocação e não tenta esgotar a memória do computador.
+O vetor atual usa armazenamento estático para até 1000 registros e armazenamento dinâmico acima disso. Os vetores de trabalho e o auxiliar do Merge Sort são dinâmicos e crescem conforme a quantidade solicitada. A fila faz cópias dinâmicas dos dados enfileirados. A geração não tem o antigo teto de 100000; verifica falhas de alocação e a representação do ID como `int`. O importador CSV ainda aceita até 100000 registros.
 
 ## Fila e pilha
 
@@ -42,4 +42,4 @@ O plano da disciplina também aborda TADs, ponteiros, listas, recursividade, ár
 
 ## Limites atuais
 
-A bateria já produz medições repetidas e gráficos com tamanhos configuráveis. O histórico interativo fica somente na memória durante a execução. O teste isolado registra o maior tamanho concluído e a primeira tentativa que falhou; seu limite é artificial e por processo, não a RAM física total. A exibição pode ser completa ou limitada a 20 registros. O programa ainda precisa de validações adicionais para importação e testes de casos extremos.
+A bateria já produz medições repetidas e gráficos com tamanhos configuráveis. O histórico interativo fica somente na memória durante a execução. O teste isolado registra o maior tamanho concluído e a primeira tentativa que falhou, caso `malloc` consiga informar a falha antes de o sistema encerrar o processo. A exibição pode ser completa ou limitada a 20 registros. O programa ainda precisa de validações adicionais para importação e testes de casos extremos.

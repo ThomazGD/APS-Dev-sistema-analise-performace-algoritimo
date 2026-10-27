@@ -54,9 +54,9 @@ void gerar_cenario(Imagem *dados, size_t n, int cenario) {
 
 static void imprimir_dados(const Imagem *dados, size_t n, size_t limite) {
     if (limite > n) limite = n;
-    puts("ID       DATA       NUVENS (%)");
+    puts("ID\t\tDATA\t\tNUVENS (%)");
     for (size_t i = 0; i < limite; ++i)
-        printf("%-8d %08d   %d\n", dados[i].id, dados[i].data, dados[i].nuvens);
+        printf("%-8d\t%08d\t%3d\n", dados[i].id, dados[i].data, dados[i].nuvens);
     if (n > limite) printf("Exibindo %zu de %zu registros.\n", limite, n);
 }
 

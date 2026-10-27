@@ -1,5 +1,7 @@
 #include "aps.h"
+#include <limits.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,7 +90,7 @@ int executar_bateria_config(const size_t *tamanhos, size_t quantidade, int repet
     if (!tamanhos || quantidade < 2 || quantidade > MAX_TAMANHOS ||
         repeticoes < 1 || repeticoes > MAX_REPETICOES) return 0;
     for (size_t i = 0; i < quantidade; ++i)
-        if (tamanhos[i] < 1 || tamanhos[i] > 100000 ||
+        if (tamanhos[i] < 1 || tamanhos[i] > INT_MAX ||
             (i && tamanhos[i] <= tamanhos[i - 1])) return 0;
     (void)CRIAR_PASTA("resultados");
     FILE *tempos = fopen("resultados/tempos.csv", "w");
@@ -100,6 +102,11 @@ int executar_bateria_config(const size_t *tamanhos, size_t quantidade, int repet
         return 0;
     }
     size_t maximo = tamanhos[quantidade - 1];
+    if (maximo > SIZE_MAX / sizeof(Imagem)) {
+        fprintf(stderr, "Tamanho excede a capacidade de enderecamento.\n");
+        fclose(tempos); fclose(resumo);
+        return 0;
+    }
     Imagem *original = malloc(maximo * sizeof *original);
     Imagem *copia = malloc(maximo * sizeof *copia);
     Imagem *aux = malloc(maximo * sizeof *aux);

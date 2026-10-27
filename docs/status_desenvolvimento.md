@@ -12,7 +12,7 @@ Esta página acompanha somente o **software em C**. A produção da monografia �
 | Comparação justa | Cada método recebe cópia da mesma entrada; somente a chamada de ordenação é cronometrada. |
 | Saída interativa | Menu, amostra ou listagem completa dos valores antes/depois, tempos e indicação de ordem correta. |
 | Estruturas da disciplina | Fila encadeada de testes pendentes e pilha encadeada de resultados. |
-| Cenários | Aleatório, ordenado e invertido; tamanho escolhido pelo usuário de 1 a 100000 registros. |
+| Cenários | Aleatório, ordenado e invertido; geração e bateria sem o antigo teto de 100000 registros, limitadas por memória e pela representação do ID como `int`. |
 | Bateria | Padrão com quatro tamanhos e cinco repetições; opção personalizada com 2 a 6 tamanhos e 1 a 10 repetições. |
 | Exportação | CSV com tempos individuais, CSV com resumos e três gráficos SVG. |
 | Memória | Vetor estático para até 1000 registros; vetor dinâmico acima disso; falha de alocação é reportada. |

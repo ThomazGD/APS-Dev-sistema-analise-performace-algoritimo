@@ -1,24 +1,47 @@
 #include "aps.h"
 #include <errno.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define CAPACIDADE 100000
 #define CAPACIDADE_ESTATICA 1000
 
 static Imagem armazenamento_estatico[CAPACIDADE_ESTATICA];
 
 static const char *nomes[] = {"Insertion Sort", "Merge Sort", "Quick Sort"};
 
-static int ler_inteiro(const char *pergunta, unsigned long *valor) {
+static int ler_inteiro(const char *pergunta, size_t *valor) {
     char linha[64], *fim;
     printf("%s", pergunta);
     if (!fgets(linha, sizeof linha, stdin)) return 0;
+    if (linha[0] == '-') return 0;
     errno = 0;
-    unsigned long numero = strtoul(linha, &fim, 10);
-    if (errno || fim == linha || (*fim != '\n' && *fim != '\0')) return 0;
-    *valor = numero;
+    unsigned long long numero = strtoull(linha, &fim, 10);
+    if (errno || fim == linha || (*fim != '\n' && *fim != '\0') || numero > SIZE_MAX) return 0;
+    *valor = (size_t)numero;
+    return 1;
+}
+
+static int preparar_vetores(Imagem **original, Imagem **copia, Imagem **aux,
+                           size_t *capacidade, size_t necessario, size_t existentes) {
+    if (necessario <= *capacidade) return 1;
+    if (necessario > SIZE_MAX / sizeof(Imagem)) return 0;
+    Imagem *novo_original = malloc(necessario * sizeof(Imagem));
+    Imagem *nova_copia = malloc(necessario * sizeof(Imagem));
+    Imagem *novo_aux = malloc(necessario * sizeof(Imagem));
+    if (!novo_original || !nova_copia || !novo_aux) {
+        free(novo_original); free(nova_copia); free(novo_aux);
+        return 0;
+    }
+    if (*original && existentes)
+        memcpy(novo_original, *original, existentes * sizeof(Imagem));
+    free(*original); free(*copia); free(*aux);
+    *original = novo_original;
+    *copia = nova_copia;
+    *aux = novo_aux;
+    *capacidade = necessario;
     return 1;
 }
 
@@ -41,33 +64,43 @@ static Resultado comparar(const Imagem *original, size_t n, Imagem *copia, Image
         else quick_sort(copia, n);
         resultado.tempos_ms[algoritmo] = (tempo_agora() - inicio) * 1000.0;
         resultado.corretos[algoritmo] = esta_ordenado(copia, n);
-        printf("\n%s: %.6f ms | %s\n", nomes[algoritmo],
-               resultado.tempos_ms[algoritmo],
-               resultado.corretos[algoritmo] ? "Ordenacao correta" : "FALHA");
+        printf("\nDepois (%s):\n", nomes[algoritmo]);
         mostrar_conforme_modo(copia, n, completo);
     }
+    puts("\nCOMPARACAO DOS TRES METODOS");
+    puts("METODO           TEMPO (ms)    VALIDACAO");
+    puts("------------------------------------------");
+    for (int i = 0; i < 3; ++i)
+        printf("%-16s\t%12.6f    %s\n", nomes[i], resultado.tempos_ms[i],
+               resultado.corretos[i] ? "OK" : "FALHA");
+    int melhor = 0, pior = 0;
+    for (int i = 1; i < 3; ++i) {
+        if (resultado.tempos_ms[i] < resultado.tempos_ms[melhor]) melhor = i;
+        if (resultado.tempos_ms[i] > resultado.tempos_ms[pior]) pior = i;
+    }
+    printf("\nNesta execucao, %s foi o mais rapido (%.6f ms) e %s o mais lento (%.6f ms).\n",
+           nomes[melhor], resultado.tempos_ms[melhor], nomes[pior], resultado.tempos_ms[pior]);
+    puts("Os tempos medem somente a ordenacao, usando copias da mesma entrada.");
     return resultado;
 }
 
 static void mostrar_resultado(const Resultado *resultado) {
     printf("Ultimo teste: %zu registros\n", resultado->quantidade_dados);
+    puts("METODO           TEMPO (ms)");
+    puts("----------------------------");
     for (int i = 0; i < 3; ++i)
-        printf("%s: %.6f ms | %s\n", nomes[i], resultado->tempos_ms[i],
-               resultado->corretos[i] ? "correto" : "FALHA");
+        printf("%-16s\t%12.6f%s\n", nomes[i], resultado->tempos_ms[i],
+               resultado->corretos[i] ? "" : "  FALHA NA VALIDACAO");
 }
 
 int main(int argc, char **argv) {
     if (argc == 2 && strcmp(argv[1], "--probe-child") == 0)
         return executar_teste_memoria_filho() ? EXIT_SUCCESS : EXIT_FAILURE;
-    Imagem *armazenamento_dinamico = malloc(CAPACIDADE * sizeof *armazenamento_dinamico);
+    Imagem *armazenamento_dinamico = NULL;
+    Imagem *copia = NULL;
+    Imagem *aux = NULL;
     Imagem *original = armazenamento_estatico;
-    Imagem *copia = malloc(CAPACIDADE * sizeof *copia);
-    Imagem *aux = malloc(CAPACIDADE * sizeof *aux);
-    if (!armazenamento_dinamico || !copia || !aux) {
-        fprintf(stderr, "Memoria insuficiente.\n");
-        free(armazenamento_dinamico); free(copia); free(aux);
-        return EXIT_FAILURE;
-    }
+    size_t capacidade = 0;
     FilaTrabalhos fila;
     PilhaResultados pilha;
     fila_iniciar(&fila);
@@ -78,7 +111,7 @@ int main(int argc, char **argv) {
     char linha[512];
     for (;;) {
         puts("\nAPS - Comparacao de ordenacao em C");
-        puts("1 - Gerar dados por tamanho e cenario\n2 - Carregar CSV\n3 - Exibir dados\n4 - Comparar agora\n5 - Enfileirar dados atuais\n6 - Executar proximo teste da fila\n7 - Consultar ultimo resultado\n8 - Remover ultimo resultado\n9 - Bateria padrao e exportar CSV/SVG\n10 - Bateria com tamanhos escolhidos\n11 - Teste controlado de escala de memoria\n12 - Alternar listagem completa/amostra\n13 - Teste isolado ate falha de memoria\n0 - Sair");
+        puts("\nDADOS\n 1\tGerar dados por tamanho e cenario\n 2\tCarregar CSV\n 3\tExibir dados\n\nCOMPARACAO\n 4\tComparar os tres metodos\n 5\tEnfileirar dados atuais\n 6\tExecutar proximo teste da fila\n 7\tConsultar ultimo resultado\n 8\tRemover ultimo resultado\n 9\tBateria padrao e exportar CSV/SVG\n10\tBateria com tamanhos escolhidos\n\nEXIBICAO E MEMORIA\n11\tTeste controlado de escala de memoria\n12\tAlternar listagem completa/amostra\n13\tTeste sem teto artificial ate falha de memoria\n 0\tSair");
         printf("Exibicao: %s\n", exibicao_completa ? "todos os registros" : "amostra de 20 registros");
         printf("Fila: %zu teste(s) | Pilha: %zu resultado(s)\nOpcao: ",
                fila.quantidade, pilha.quantidade);
@@ -86,15 +119,20 @@ int main(int argc, char **argv) {
         linha[strcspn(linha, "\r\n")] = '\0';
         if (strcmp(linha, "0") == 0) break;
         if (strcmp(linha, "1") == 0) {
-            unsigned long quantidade, cenario;
-            if (!ler_inteiro("Quantidade (1 a 100000): ", &quantidade) ||
-                quantidade < 1 || quantidade > CAPACIDADE ||
+            size_t quantidade, cenario;
+            if (!ler_inteiro("Quantidade de registros: ", &quantidade) ||
+                quantidade < 1 || quantidade > INT_MAX ||
                 !ler_inteiro("Cenario (1 aleatorio, 2 ordenado, 3 invertido): ", &cenario) ||
                 cenario < 1 || cenario > 3) {
                 puts("Quantidade ou cenario invalido.");
                 continue;
             }
-            n = (size_t)quantidade;
+            if (!preparar_vetores(&armazenamento_dinamico, &copia, &aux,
+                                 &capacidade, quantidade, n > CAPACIDADE_ESTATICA ? n : 0)) {
+                puts("Memoria insuficiente para os tres vetores. A base anterior foi mantida.");
+                continue;
+            }
+            n = quantidade;
             original = n <= CAPACIDADE_ESTATICA ? armazenamento_estatico : armazenamento_dinamico;
             gerar_cenario(original, n, (int)cenario);
             printf("%zu registros gerados (%s).\n", n,
@@ -103,7 +141,13 @@ int main(int argc, char **argv) {
             printf("Caminho do CSV (ex.: dados/exemplo.csv): ");
             if (!fgets(linha, sizeof linha, stdin)) break;
             linha[strcspn(linha, "\r\n")] = '\0';
-            size_t carregados = carregar_csv(linha, copia, CAPACIDADE);
+            if (!preparar_vetores(&armazenamento_dinamico, &copia, &aux,
+                                 &capacidade, 100000, n > CAPACIDADE_ESTATICA ? n : 0)) {
+                puts("Memoria insuficiente para carregar o CSV.");
+                continue;
+            }
+            original = n <= CAPACIDADE_ESTATICA ? armazenamento_estatico : armazenamento_dinamico;
+            size_t carregados = carregar_csv(linha, copia, 100000);
             if (carregados) {
                 n = carregados;
                 original = n <= CAPACIDADE_ESTATICA ? armazenamento_estatico : armazenamento_dinamico;
@@ -129,6 +173,13 @@ int main(int argc, char **argv) {
                 puts("A fila esta vazia.");
                 continue;
             }
+            if (!preparar_vetores(&armazenamento_dinamico, &copia, &aux,
+                                 &capacidade, quantidade, n > CAPACIDADE_ESTATICA ? n : 0)) {
+                puts("Memoria insuficiente para executar o teste enfileirado.");
+                free(pendente);
+                continue;
+            }
+            original = n <= CAPACIDADE_ESTATICA ? armazenamento_estatico : armazenamento_dinamico;
             Resultado resultado = comparar(pendente, quantidade, copia, aux, exibicao_completa);
             free(pendente);
             if (!pilha_empilhar(&pilha, resultado))
@@ -145,7 +196,7 @@ int main(int argc, char **argv) {
         } else if (strcmp(linha, "9") == 0) {
             (void)executar_bateria();
         } else if (strcmp(linha, "10") == 0) {
-            unsigned long quantidade, repeticoes, valor;
+            size_t quantidade, repeticoes, valor;
             size_t tamanhos[6];
             if (!ler_inteiro("Quantos tamanhos (2 a 6): ", &quantidade) ||
                 quantidade < 2 || quantidade > 6) {
@@ -154,8 +205,8 @@ int main(int argc, char **argv) {
             }
             size_t i;
             for (i = 0; i < quantidade; ++i) {
-                if (!ler_inteiro("Tamanho (1 a 100000, em ordem crescente): ", &valor) ||
-                    valor < 1 || valor > CAPACIDADE ||
+                if (!ler_inteiro("Tamanho (em ordem crescente): ", &valor) ||
+                    valor < 1 || valor > INT_MAX ||
                     (i > 0 && valor <= tamanhos[i - 1])) break;
                 tamanhos[i] = (size_t)valor;
             }
@@ -167,7 +218,7 @@ int main(int argc, char **argv) {
             }
             (void)executar_bateria_config(tamanhos, (size_t)quantidade, (int)repeticoes);
         } else if (strcmp(linha, "11") == 0) {
-            unsigned long limite;
+            size_t limite;
             if (!ler_inteiro("Limite de memoria para o teste em MiB (1 a 1024): ", &limite) ||
                 limite < 1 || limite > 1024) {
                 puts("Limite invalido.");
@@ -179,13 +230,7 @@ int main(int argc, char **argv) {
             printf("Exibicao alterada: %s.\n",
                    exibicao_completa ? "todos os registros" : "amostra de 20 registros");
         } else if (strcmp(linha, "13") == 0) {
-            unsigned long limite;
-            if (!ler_inteiro("Limite isolado do processo em MiB (64 a 1024): ", &limite) ||
-                limite < 64 || limite > 1024) {
-                puts("Limite invalido.");
-                continue;
-            }
-            (void)executar_teste_memoria_ate_falha((size_t)limite);
+            (void)executar_teste_memoria_ate_falha();
         } else puts("Opcao invalida.");
     }
     fila_limpar(&fila);

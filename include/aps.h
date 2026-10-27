@@ -53,7 +53,7 @@ double tempo_agora(void);
 int executar_bateria(void);
 int executar_bateria_config(const size_t *tamanhos, size_t quantidade, int repeticoes);
 int executar_teste_memoria(size_t limite_mb);
-int executar_teste_memoria_ate_falha(size_t limite_mb);
+int executar_teste_memoria_ate_falha(void);
 int executar_teste_memoria_filho(void);
 
 #endif
